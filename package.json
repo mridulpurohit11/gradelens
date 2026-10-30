@@ -1,0 +1,12 @@
+{
+  "name": "gradelens",
+  "private": true,
+  "version": "1.0.0",
+  "description": "GradeLens — AI-assisted assignment evaluation for faculty (web + Android + iOS)",
+  "scripts": {
+    "build": "npm ci --prefix app --include=dev && npm run build --prefix app && npm ci --prefix server --include=dev && npm run build --prefix server",
+    "start": "npm start --prefix server",
+    "test": "npm test --prefix server"
+  },
+  "engines": { "node": ">=20" }
+}

@@ -1,0 +1,126 @@
+@import '@fontsource-variable/inter';
+
+/* Material Symbols Outlined, reduced to the icons the app uses (see scripts/subset-icons.py). */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('./assets/material-symbols-subset.woff2') format('woff2');
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: 247 248 250;
+    --surface: 255 255 255;
+    --subtle: 243 245 248;
+    --line: 225 229 235;
+    --ink: 26 29 35;
+    --muted: 95 107 122;
+    --primary: 30 58 95;
+    --primary-hover: 22 48 79;
+    --primary-tint: 232 238 245;
+    --on-primary: 255 255 255;
+    --accent: 42 127 143;
+    --success: 46 125 50;
+    --success-tint: 232 245 233;
+    --warning: 183 121 31;
+    --warning-tint: 255 248 225;
+    --danger: 198 40 40;
+    --danger-tint: 253 236 234;
+    --info: 21 101 192;
+    --info-tint: 227 242 253;
+    color-scheme: light;
+  }
+  .dark {
+    --bg: 15 23 32;
+    --surface: 26 36 51;
+    --subtle: 32 44 61;
+    --line: 42 54 71;
+    --ink: 230 234 240;
+    --muted: 154 166 181;
+    --primary: 96 142 199;
+    --primary-hover: 120 160 210;
+    --primary-tint: 30 45 66;
+    --on-primary: 11 20 32;
+    --accent: 77 182 199;
+    --success: 102 187 106;
+    --success-tint: 24 46 31;
+    --warning: 230 168 70;
+    --warning-tint: 51 41 22;
+    --danger: 239 98 95;
+    --danger-tint: 60 28 30;
+    --info: 110 168 235;
+    --info-tint: 22 38 61;
+    color-scheme: dark;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-bg text-ink font-sans text-body antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    min-height: 100dvh;
+    overscroll-behavior-y: none;
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--primary));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .icon {
+    font-family: 'Material Symbols Outlined';
+    font-weight: 400;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    user-select: none;
+  }
+  .icon-fill {
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+  .card {
+    @apply bg-surface border border-line rounded-card shadow-card;
+  }
+  .label {
+    @apply block text-small font-semibold text-ink mb-1.5;
+  }
+  .eyebrow {
+    @apply text-caption font-semibold uppercase tracking-[0.06em] text-muted;
+  }
+  .input {
+    @apply w-full h-12 lg:h-11 rounded-ctl border border-line bg-surface px-3.5 text-body text-ink placeholder:text-muted/80
+      transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-tint disabled:bg-subtle disabled:text-muted;
+  }
+  .input-error {
+    @apply border-danger focus:border-danger focus:ring-danger-tint;
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
