@@ -35,7 +35,13 @@ const schema = z.object({
     .transform((v) => v !== 'false'),
 });
 
-const parsed = schema.safeParse(process.env);
+// Treat empty values in .env (e.g. "FRONTEND_URL=") as "not set".
+const raw = Object.fromEntries(
+  Object.entries(process.env)
+    .map(([k, v]) => [k, v?.trim().replace(/^["']|["']$/g, '')] as const)
+    .filter(([, v]) => v !== undefined && v !== ''),
+);
+const parsed = schema.safeParse(raw);
 if (!parsed.success) {
   console.error('Invalid environment configuration:');
   for (const issue of parsed.error.issues) console.error(`  ${issue.path.join('.')}: ${issue.message}`);

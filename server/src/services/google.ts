@@ -4,7 +4,7 @@ import { sheets as sheetsApi } from '@googleapis/sheets';
 import { eq } from 'drizzle-orm';
 import { env } from '../env.js';
 import { HttpError } from '../lib/http.js';
-import { decrypt, encrypt } from '../lib/crypto.js';
+import { encrypt, tryDecrypt } from '../lib/crypto.js';
 import { db, schema } from '../db/index.js';
 import type { Teacher } from '../db/schema.js';
 
@@ -73,8 +73,14 @@ export function clientForTeacher(teacher: Pick<Teacher, 'id' | 'googleRefreshTok
   if (!teacher.googleRefreshTokenEnc) {
     throw new HttpError(401, 'Please sign in with Google again to grant Drive access.', 'GOOGLE_REAUTH');
   }
+  const refreshToken = tryDecrypt(teacher.googleRefreshTokenEnc);
+  if (!refreshToken) {
+    // Stored with an older TOKEN_ENCRYPTION_KEY: drop it so the next sign-in asks Google for a fresh one.
+    db.update(schema.teachers).set({ googleRefreshTokenEnc: null }).where(eq(schema.teachers.id, teacher.id)).catch(() => undefined);
+    throw new HttpError(401, 'Please sign in with Google again to grant Drive access.', 'GOOGLE_REAUTH');
+  }
   const client = oauthClient();
-  client.setCredentials({ refresh_token: decrypt(teacher.googleRefreshTokenEnc) });
+  client.setCredentials({ refresh_token: refreshToken });
   client.on('tokens', (t) => {
     // Google can rotate refresh tokens; keep the newest one.
     if (t.refresh_token) {
@@ -90,7 +96,8 @@ export function clientForTeacher(teacher: Pick<Teacher, 'id' | 'googleRefreshTok
 export async function revokeTeacherToken(teacher: Pick<Teacher, 'googleRefreshTokenEnc'>) {
   if (!teacher.googleRefreshTokenEnc || !env.googleConfigured) return;
   try {
-    await oauthClient().revokeToken(decrypt(teacher.googleRefreshTokenEnc));
+    const t = tryDecrypt(teacher.googleRefreshTokenEnc);
+    if (t) await oauthClient().revokeToken(t);
   } catch {
     /* token may already be revoked */
   }
@@ -102,7 +109,7 @@ export function googleError(err: unknown, context = 'this link'): HttpError {
   const e = err as { code?: number | string; status?: number; message?: string; response?: { status?: number; data?: { error?: string } } };
   const status = Number(e.status ?? e.response?.status ?? e.code);
   const msg = `${e.message ?? ''} ${e.response?.data?.error ?? ''}`;
-  if (msg.includes('invalid_grant') || status === 401) {
+  if (/invalid_grant|unauthorized_client|invalid_client/.test(msg) || status === 401) {
     return new HttpError(401, 'Your Google access has expired. Please sign in again.', 'GOOGLE_REAUTH');
   }
   if (status === 403 && /has not been used|is disabled|accessNotConfigured/i.test(msg)) {

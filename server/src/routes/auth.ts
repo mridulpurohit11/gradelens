@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { env } from '../env.js';
 import { ah, HttpError } from '../lib/http.js';
-import { encrypt, randomToken } from '../lib/crypto.js';
+import { encrypt, randomToken, tryDecrypt } from '../lib/crypto.js';
 import { signSession, signState, verifyState } from '../lib/jwt.js';
 import { buildAuthUrl, exchangeCode, type GoogleIdentity } from '../services/google.js';
 import { isAllowedWebReturn } from '../lib/origins.js';
@@ -133,8 +133,8 @@ authRouter.get(
     const teacher = await upsertTeacher(identity);
 
     // Without a refresh token GradeLens cannot read Drive in the background: ask Google for consent once.
-    if (!teacher.googleRefreshTokenEnc && !state.c) {
-      const retry: OAuthState = { ...state, c: true };
+    if (!tryDecrypt(teacher.googleRefreshTokenEnc) && !state.c) {
+      const retry: OAuthState = { p: state.p, s: state.s, r: state.r, c: true };
       return res.redirect(buildAuthUrl(signState(retry), true));
     }
 

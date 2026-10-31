@@ -13,7 +13,9 @@ export function verifySession(token: string): SessionClaims {
 
 /** Short-lived signed state for the OAuth round trip. */
 export function signState(data: Record<string, unknown>): string {
-  return jwt.sign(data, env.JWT_SECRET, { expiresIn: '15m', issuer: 'gradelens-oauth' });
+  // Drop claims left over from a previously verified state (exp/iat/iss) before re-signing.
+  const { exp: _e, iat: _i, iss: _s, ...clean } = data;
+  return jwt.sign(clean, env.JWT_SECRET, { expiresIn: '15m', issuer: 'gradelens-oauth' });
 }
 
 export function verifyState<T>(token: string): T {

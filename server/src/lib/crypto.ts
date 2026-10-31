@@ -22,3 +22,13 @@ export function decrypt(payload: string): string {
 export function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString('base64url');
 }
+
+/** Like decrypt(), but returns null when the value was encrypted with a different key or is corrupt. */
+export function tryDecrypt(payload: string | null | undefined): string | null {
+  if (!payload) return null;
+  try {
+    return decrypt(payload);
+  } catch {
+    return null;
+  }
+}
