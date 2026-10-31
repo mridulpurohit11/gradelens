@@ -6,6 +6,21 @@ import { Banner, Button, Field, Icon, Input, Segmented, Spinner } from '@/compon
 
 export type VerifyOutcome = { message: string; warning?: string };
 
+/** Client-side check of a submission link. Returns an error message, or null when the link looks valid. */
+export function sourceLinkError(type: SourceType, url: string): string | null {
+  const s = url.trim();
+  if (!s) return type === 'DRIVE_FOLDER' ? 'Google Drive folder link is required' : 'Google Sheet link is required';
+  if (type === 'DRIVE_FOLDER') {
+    if (/docs\.google\.com\/spreadsheets/.test(s)) return 'This is a Google Sheet link. Switch to "Google Sheet" above, or paste a Drive folder link.';
+    if (/drive\.google\.com\/file\//.test(s)) return 'This is a link to a single file. Paste the link of the folder that contains the submissions.';
+    if (!/\/folders\/[a-zA-Z0-9_-]{10,}/.test(s) && !/[?&]id=[a-zA-Z0-9_-]{10,}/.test(s)) return 'Enter a valid Google Drive folder link (https://drive.google.com/drive/folders/…)';
+    return null;
+  }
+  if (/drive\.google\.com\/drive\/folders/.test(s)) return 'This is a Drive folder link. Switch to "Google Drive Folder" above, or paste a Google Sheet link.';
+  if (!/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]{10,}/.test(s)) return 'Enter a valid Google Sheet link (https://docs.google.com/spreadsheets/d/…)';
+  return null;
+}
+
 export async function verifyLink(type: SourceType, url: string): Promise<VerifyOutcome> {
   const r = await api<{ fileCount: number; name: string; kind: string; warning?: string }>('/tools/sources/verify', {
     method: 'POST',
@@ -24,19 +39,23 @@ export function SourcePicker({
   onChange,
   verify = verifyLink,
   autoVerify,
+  error,
 }: {
   type: SourceType;
   url: string;
   onChange: (type: SourceType, url: string) => void;
   verify?: (type: SourceType, url: string) => Promise<VerifyOutcome>;
   autoVerify?: boolean;
+  /** Validation error shown under the link field (e.g. "required"). */
+  error?: string | null;
 }) {
   const [state, setState] = useState<{ status: 'idle' | 'busy' | 'ok' | 'error'; message?: string; warning?: string }>({ status: 'idle' });
   const last = useRef('');
 
   const run = async () => {
-    if (!url.trim()) {
-      setState({ status: 'error', message: 'Paste a link first.' });
+    const invalid = sourceLinkError(type, url);
+    if (invalid) {
+      setState({ status: 'error', message: invalid });
       return;
     }
     setState({ status: 'busy' });
@@ -69,6 +88,8 @@ export function SourcePicker({
       />
       <Field
         label={type === 'DRIVE_FOLDER' ? 'Shared folder link' : 'Form responses sheet link'}
+        required
+        error={state.status === 'error' ? null : error}
         hint={
           type === 'DRIVE_FOLDER'
             ? 'Students upload into this folder (files named with roll number, or one sub-folder per student).'
@@ -84,6 +105,7 @@ export function SourcePicker({
                 onChange(type, e.target.value);
               }}
               placeholder={type === 'DRIVE_FOLDER' ? 'https://drive.google.com/drive/folders/…' : 'https://docs.google.com/spreadsheets/d/…'}
+              invalid={Boolean(error) || state.status === 'error'}
               inputMode="url"
               autoCapitalize="off"
               autoCorrect="off"

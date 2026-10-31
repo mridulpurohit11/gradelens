@@ -8,7 +8,7 @@ import { fmtDate, fmtNum, toDateInput } from '@/lib/format';
 import { Page } from '@/components/layout/AppShell';
 import { Banner, Button, Card, Chip, Dialog, EmptyState, ErrorState, Field, Icon, Input, Segmented, Select, SkeletonList, Spinner, Stepper, TextArea, Toggle } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
-import { SourcePicker } from '@/components/sources';
+import { SourcePicker, sourceLinkError } from '@/components/sources';
 
 const STEPS = ['Class', 'Questions & Marks', 'Submissions'];
 const EDITABLE = new Set(['DRAFT', 'KEY_READY']);
@@ -420,6 +420,7 @@ function StepSubmissions({ a, onBack }: { a: Assignment; onBack: () => void }) {
   const [showMissing, setShowMissing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const hasKey = a.questions.length > 0 && a.questions.every((q) => q.rubric.length > 0);
 
   const verify = async (type: SourceType, url: string) => {
@@ -435,10 +436,23 @@ function StepSubmissions({ a, onBack }: { a: Assignment; onBack: () => void }) {
   };
 
   const proceed = async () => {
+    const invalid = sourceLinkError(source.type, source.url);
+    setLinkError(invalid);
+    if (invalid) {
+      setError('Add the link where students submitted their work.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await api(`/assignments/${a.id}`, { method: 'PUT', body: { sourceType: source.url.trim() ? source.type : null, sourceUrl: source.url.trim() || null } });
+      // Check that the folder/sheet can be opened before moving on.
+      try {
+        await verify(source.type, source.url.trim());
+      } catch (e) {
+        setLinkError(errorMessage(e));
+        throw new Error('The submission link could not be opened. Check the link and that it is shared with your Google account.');
+      }
+      await api(`/assignments/${a.id}`, { method: 'PUT', body: { sourceType: source.type, sourceUrl: source.url.trim() } });
       if (!hasKey) {
         const updated = await api<Assignment>(`/assignments/${a.id}/answer-key`, { method: 'POST', body: {} });
         qc.setQueryData(['assignment', a.id], updated);
@@ -461,7 +475,17 @@ function StepSubmissions({ a, onBack }: { a: Assignment; onBack: () => void }) {
       </div>
       {error ? <Banner tone="danger" className="mb-4">{error}</Banner> : null}
       <Card>
-        <SourcePicker type={source.type} url={source.url} onChange={(type, url) => setSource({ type, url })} verify={verify} autoVerify={Boolean(source.url)} />
+        <SourcePicker
+          type={source.type}
+          url={source.url}
+          error={linkError}
+          onChange={(type, url) => {
+            setSource({ type, url });
+            if (linkError) setLinkError(sourceLinkError(type, url));
+          }}
+          verify={verify}
+          autoVerify={Boolean(source.url)}
+        />
         {preview?.missing.length ? (
           <div className="mt-3">
             <Button variant="text" icon="person_search" onClick={() => setShowMissing(true)} className="text-small">
@@ -470,7 +494,6 @@ function StepSubmissions({ a, onBack }: { a: Assignment; onBack: () => void }) {
           </div>
         ) : null}
       </Card>
-      {!source.url.trim() ? <Banner tone="warning" className="mt-4">You can add the link later, but it is required before evaluation.</Banner> : null}
       {!hasKey && !config?.aiConfigured ? <Banner tone="warning" className="mt-4">AI is not configured on the server, so the answer key cannot be generated automatically.</Banner> : null}
       {busy && !hasKey ? (
         <p className="mt-4 flex items-center justify-center gap-2 text-small text-muted">

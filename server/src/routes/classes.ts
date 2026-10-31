@@ -28,8 +28,8 @@ const classSchema = z.object({
   section: z.string().trim().min(1, 'Section is required').max(20),
   subjectName: z.string().trim().min(2, 'Subject name is required').max(160),
   subjectCode: z.string().trim().max(40).optional().nullable(),
-  sourceType: sourceType.optional().nullable(),
-  sourceUrl: z.string().trim().max(500).optional().nullable(),
+  sourceType: sourceType,
+  sourceUrl: z.string().trim().min(10, 'Google Drive folder or Sheet link is required').max(500),
   rosterSheetUrl: z.string().trim().max(500).optional().nullable(),
   students: z.array(studentSchema).max(2000).optional(),
 });

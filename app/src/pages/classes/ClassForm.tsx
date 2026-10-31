@@ -6,7 +6,7 @@ import type { ClassItem, RosterStudent, SourceType } from '@/lib/types';
 import { Page } from '@/components/layout/AppShell';
 import { Banner, Button, Card, Chip, ConfirmDialog, ErrorState, Field, Input, Select, SkeletonList } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
-import { RosterImporter, SourcePicker } from '@/components/sources';
+import { RosterImporter, SourcePicker, sourceLinkError, verifyLink } from '@/components/sources';
 
 export const COURSES = ['MCA', 'BCA', 'B.Tech', 'M.Tech', 'MBA', 'BBA', 'B.Sc', 'M.Sc', 'B.Com', 'M.Com', 'BA', 'MA', 'Ph.D', 'Other'];
 export const SEMESTERS = [...Array.from({ length: 10 }, (_, i) => `Semester ${i + 1}`), 'Year 1', 'Year 2', 'Year 3', 'Year 4'];
@@ -23,6 +23,7 @@ export default function ClassForm() {
   const [source, setSource] = useState<{ type: SourceType; url: string }>({ type: 'DRIVE_FOLDER', url: '' });
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [touched, setTouched] = useState(false);
+  const [sourceError, setSourceError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -41,26 +42,39 @@ export default function ClassForm() {
     course: !course ? 'Course is required' : null,
     section: !form.section.trim() ? 'Section is required' : null,
     subjectName: form.subjectName.trim().length < 2 ? 'Subject name is required' : null,
+    source: sourceLinkError(source.type, source.url),
   };
   const show = (k: keyof typeof errors) => (touched ? errors[k] : null);
   const set = <K extends keyof typeof form>(k: K, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const save = async () => {
     setTouched(true);
+    setSourceError(errors.source);
     if (Object.values(errors).some(Boolean)) {
+      setError('Please fill all required fields.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     setSaving(true);
     setError(null);
+    // Make sure GradeLens can actually open the folder/sheet before saving the class.
+    try {
+      await verifyLink(source.type, source.url.trim());
+    } catch (e) {
+      setSourceError(errorMessage(e));
+      setError('The submission link could not be opened. Check the link and that it is shared with your Google account.');
+      setSaving(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     const body = {
       course,
       semester: form.semester,
       section: form.section.trim(),
       subjectCode: form.subjectCode.trim() || null,
       subjectName: form.subjectName.trim(),
-      sourceType: source.url.trim() ? source.type : null,
-      sourceUrl: source.url.trim() || null,
+      sourceType: source.type,
+      sourceUrl: source.url.trim(),
       ...(editing ? {} : { students }),
     };
     try {
@@ -156,11 +170,19 @@ export default function ClassForm() {
 
         <section>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-h3 text-primary dark:text-ink">Default Submission Source</h2>
-            <span className="text-caption text-muted">Optional</span>
+            <h2 className="text-h3 text-primary dark:text-ink">Submission Source</h2>
+            <span className="text-caption font-semibold text-danger">Required</span>
           </div>
           <Card>
-            <SourcePicker type={source.type} url={source.url} onChange={(type, url) => setSource({ type, url })} />
+            <SourcePicker
+              type={source.type}
+              url={source.url}
+              error={touched ? sourceError : null}
+              onChange={(type, url) => {
+                setSource({ type, url });
+                if (touched) setSourceError(sourceLinkError(type, url));
+              }}
+            />
           </Card>
         </section>
 
